@@ -204,17 +204,30 @@ local upgradeEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Sta
 
 local function parseMoney(text)
     if type(text) == "number" then return text end
-    local cleanText = tostring(text):gsub("[%$%,%s]", "")
+    local cleanText = tostring(text):lower():gsub("[%$%,%s]", "")
     local numberPart = tonumber(cleanText:match("[%d%.]+"))
     if not numberPart then return 0 end
-    
-    local suffix = cleanText:match("([kKmMbBtT])$")
-    local multiplier = ({ k = 1e3, m = 1e6, b = 1e9, t = 1e12 })[(suffix or ""):lower()] or 1
-    
+
+    local suffix = cleanText:match("([a-z]+)$") or ""
+    local multiplier = ({
+        k = 1e3,
+        m = 1e6,
+        b = 1e9,
+        t = 1e12,
+        qa = 1e15,
+        qi = 1e18,
+        sx = 1e21,
+        sp = 1e24,
+        oc = 1e27,
+        no = 1e30,
+        dc = 1e33,
+    })[suffix] or 1
+
     return numberPart * multiplier
 end
 
 local lastAttemptPrice = nil
+local lastAttemptTime = 0
 local lastDebugSnapshot = nil
 
 local function getUpgradePriceLabel()
@@ -235,7 +248,7 @@ local function getUpgradePriceLabel()
     return nil
 end
 
--- Cek harga dan saldo berulang; upgrade dikirim sekali saat saldo mencukupi.
+-- Cek saldo berulang. Jika request tidak mengubah harga, coba lagi setelah jeda.
 task.spawn(function()
     while task.wait(1) do
         local priceLabel = getUpgradePriceLabel()
@@ -259,10 +272,13 @@ task.spawn(function()
             -- Harga berubah setelah upgrade, jadi izinkan request untuk harga baru.
             if lastAttemptPrice and hargaUpgrade ~= lastAttemptPrice then
                 lastAttemptPrice = nil
+                lastAttemptTime = 0
             end
 
-            if hargaUpgrade > 0 and uangGua >= hargaUpgrade and lastAttemptPrice ~= hargaUpgrade then
+            local retryReady = lastAttemptPrice ~= hargaUpgrade or (os.clock() - lastAttemptTime >= 5)
+            if hargaUpgrade > 0 and uangGua >= hargaUpgrade and retryReady then
                 lastAttemptPrice = hargaUpgrade
+                lastAttemptTime = os.clock()
                 print("[AutoUpgrade] Saldo cukup; mengirim request untuk", priceLabel.Text)
 
                 local success, result = pcall(function()
@@ -272,14 +288,21 @@ task.spawn(function()
                 if success then
                     print("[AutoUpgrade] Request terkirim. Hasil server:", tostring(result))
                     task.spawn(function()
-                        -- Tunggu stand selesai diperbarui, lalu kembalikan karakter ke PullUpStand.
-                        task.wait(1.5)
-                        for attempt = 1, 5 do
-                            if teleportToPullUpStand() then
-                                print("[AutoUpgrade] Karakter dikembalikan ke PullUpStand.")
+                        -- Anggap upgrade berhasil setelah harga berubah, lalu kembali ke PullUpStand.
+                        for _ = 1, 8 do
+                            task.wait(1)
+                            local updatedPriceLabel = getUpgradePriceLabel()
+                            if updatedPriceLabel and parseMoney(updatedPriceLabel.Text) ~= hargaUpgrade then
+                                task.wait(0.5)
+                                for attempt = 1, 5 do
+                                    if teleportToPullUpStand() then
+                                        print("[AutoUpgrade] Karakter dikembalikan ke PullUpStand.")
+                                        break
+                                    end
+                                    task.wait(1)
+                                end
                                 break
                             end
-                            task.wait(1)
                         end
                     end)
                 else
