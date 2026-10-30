@@ -100,7 +100,6 @@ invisibleClicker.MouseButton1Click:Connect(function()
     end
 end)
 
-print("[MELOAD] Template Berjalan!")
 
 -- Variabel Kontrol Auto Reconnect
 local autoReconnectEnabled = true
@@ -181,7 +180,6 @@ local function teleportToPullUpStand()
             
             if targetPart and rootPart then
                 rootPart.CFrame = targetPart.CFrame * CFrame.new(0, 3, 0)
-                print("[Teleport] Sukses pindah ke PullUpStand di plot:", myPlot.Name)
                 return true
             end
         end
@@ -228,7 +226,6 @@ end
 
 local lastAttemptPrice = nil
 local lastAttemptTime = 0
-local lastDebugSnapshot = nil
 
 local function getUpgradePriceLabel()
     local localPlotProps = workspace:FindFirstChild("LocalPlotProps")
@@ -259,16 +256,6 @@ task.spawn(function()
             local hargaUpgrade = parseMoney(priceLabel.Text)
             local uangGua = parseMoney(moneyStat.Value)
 
-            local debugSnapshot = tostring(priceLabel.Text) .. "|" .. tostring(moneyStat.Value)
-            if debugSnapshot ~= lastDebugSnapshot then
-                lastDebugSnapshot = debugSnapshot
-                print(string.format(
-                    "[AutoUpgrade] Harga=%s (%s) | Uang=%s (%s)",
-                    tostring(priceLabel.Text), tostring(hargaUpgrade),
-                    tostring(moneyStat.Value), tostring(uangGua)
-                ))
-            end
-
             -- Harga berubah setelah upgrade, jadi izinkan request untuk harga baru.
             if lastAttemptPrice and hargaUpgrade ~= lastAttemptPrice then
                 lastAttemptPrice = nil
@@ -279,14 +266,11 @@ task.spawn(function()
             if hargaUpgrade > 0 and uangGua >= hargaUpgrade and retryReady then
                 lastAttemptPrice = hargaUpgrade
                 lastAttemptTime = os.clock()
-                print("[AutoUpgrade] Saldo cukup; mengirim request untuk", priceLabel.Text)
-
-                local success, result = pcall(function()
+                local success, err = pcall(function()
                     return upgradeEvent:InvokeServer()
                 end)
 
                 if success then
-                    print("[AutoUpgrade] Request terkirim. Hasil server:", tostring(result))
                     task.spawn(function()
                         -- Anggap upgrade berhasil setelah harga berubah, lalu kembali ke PullUpStand.
                         for _ = 1, 8 do
@@ -296,7 +280,6 @@ task.spawn(function()
                                 task.wait(0.5)
                                 for attempt = 1, 5 do
                                     if teleportToPullUpStand() then
-                                        print("[AutoUpgrade] Karakter dikembalikan ke PullUpStand.")
                                         break
                                     end
                                     task.wait(1)
@@ -306,7 +289,7 @@ task.spawn(function()
                         end
                     end)
                 else
-                    warn("[AutoUpgrade] Request gagal:", tostring(result))
+                    warn("[AutoUpgrade] Request gagal:", tostring(err))
                     lastAttemptPrice = nil
                 end
             end
