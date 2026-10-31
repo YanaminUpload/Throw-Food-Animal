@@ -3,14 +3,6 @@ if not game:IsLoaded() then
     game.Loaded:Wait() 
 end
 
--- ==================== [ KODE TAMBAHAN COBALT ] ====================
--- Menjalankan klaim offline pertama kali saat skrip dieksekusi
-pcall(function()
-    local CobaltEvent = game:GetService("ReplicatedStorage").Remotes.Offline_Claim
-    CobaltEvent:InvokeServer()
-end)
--- ==================================================================
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
@@ -210,8 +202,8 @@ local upgradeEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Sta
 
 local function parseMoney(text)
     if type(text) == "number" then return text end
-    local cleanText = tostring(text):lower():gsub("[%%$%%,%%s]", "")
-    local numberPart = tonumber(cleanText:match("[%%d%%.]+"))
+    local cleanText = tostring(text):lower():gsub("[%$%,%s]", "")
+    local numberPart = tonumber(cleanText:match("[%d%.]+"))
     if not numberPart then return 0 end
 
     local suffix = cleanText:match("([a-z]+)$") or ""
